@@ -1,6 +1,7 @@
 // PDF Generator for White Angel Events
-// Generates multi-page high-fidelity PDF with Cover Page (Page 1), Letterhead Quotation (Page 2), 
-// and Normal White Pages for Page 3+ & Photo Gallery (4-up per page).
+// Page 1: Cover Page (cover_page.jpg)
+// Page 2: Quotation Letterhead (letterhead_template.jpg) ONLY for Page 2
+// Page 3+: Normal Clean White Pages (NO Letterhead background) for overflow & Photo Gallery
 
 window.PdfGenerator = {
   async generatePdf(quotationData) {
@@ -31,8 +32,8 @@ window.PdfGenerator = {
       loadImage(assets.letterhead || 'assets/letterhead_template.jpg')
     ]);
 
-    // Helper to format currency safely for jsPDF standard fonts (using Rs. instead of unicode symbol)
-    const formatCurrency = (val) => {
+    // Format currency safely for jsPDF standard fonts (NO unicode ₹ to prevent ¹ encoding corruption and offset)
+    const formatRs = (val) => {
       const num = Number(val) || 0;
       return 'Rs. ' + num.toLocaleString('en-IN');
     };
@@ -52,7 +53,7 @@ window.PdfGenerator = {
       doc.text("WHITE ANGEL EVENTS", pageWidth / 2, 90, { align: 'center' });
     }
 
-    // Elegant overlay tag for Client Name at bottom of Cover Page
+    // Overlay tag for Client Name at bottom of Cover Page
     const groom = quotationData.clientDetails.groomName || '';
     const bride = quotationData.clientDetails.brideName || '';
     const clientTitle = [groom, bride].filter(Boolean).join(' & ') || 'VALUED CLIENT';
@@ -76,7 +77,7 @@ window.PdfGenerator = {
     // ----------------------------------------------------
     // PAGE 2: QUOTATION LETTERHEAD (ONLY Page 2 uses Letterhead)
     // ----------------------------------------------------
-    doc.addPage();
+    doc.addPage(); // Page 2
     if (letterheadImg) {
       doc.addImage(letterheadImg, 'JPEG', 0, 0, pageWidth, pageHeight);
     } else {
@@ -89,36 +90,6 @@ window.PdfGenerator = {
     }
 
     let yPos = 48;
-
-    // Helper for Normal Pages (Page 3 onwards - NO Letterhead graphic background)
-    const startNormalPage = (title = "EVENT QUOTATION") => {
-      doc.addPage();
-      // Simple clean header bar for normal pages
-      doc.setFillColor(15, 22, 38);
-      doc.rect(0, 0, pageWidth, 20, 'F');
-
-      if (logoImg) {
-        doc.addImage(logoImg, 'JPEG', 12, 3, 24, 14);
-      }
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text("WHITE ANGEL EVENTS", 40, 12);
-      
-      doc.setFontSize(9);
-      doc.setTextColor(0, 210, 255);
-      doc.text(title, pageWidth - 14, 12, { align: 'right' });
-
-      doc.setDrawColor(0, 136, 255);
-      doc.setLineWidth(0.5);
-      doc.line(0, 20, pageWidth, 20);
-
-      // Clean footer
-      doc.setFontSize(8);
-      doc.setTextColor(120, 120, 120);
-      doc.text(`White Angel Events  |  Contact: 8149634555  |  Page ${doc.internal.getNumberOfPages()}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
-    };
-
 
     // 1. Client & Event Info Box (Includes Event / Function Types)
     doc.setFillColor(248, 250, 254);
@@ -143,7 +114,7 @@ window.PdfGenerator = {
     doc.text(`Guest Count: ${quotationData.eventDetails.guestCount || '-'}`, col2X, yPos + 19);
     doc.text(`Event Time: ${quotationData.eventDetails.eventTime || '-'}`, col2X, yPos + 25);
 
-    // Event / Function Type(s) Mentioned Prominently
+    // Event / Function Type(s) Highlight
     const functionsStr = (quotationData.selectedFunctions && quotationData.selectedFunctions.length > 0)
       ? quotationData.selectedFunctions.join(', ')
       : 'Wedding Event';
@@ -160,7 +131,7 @@ window.PdfGenerator = {
     // 2. Itemized Requirements & Billing Table
     const tableHeaderHeight = 8;
     const rowHeight = 7.5;
-    const maxPage2Y = pageHeight - 38;
+    const page2MaxY = 250; // Printable boundary for Page 2
 
     const drawTableHeader = (y) => {
       doc.setFillColor(0, 86, 179);
@@ -169,8 +140,8 @@ window.PdfGenerator = {
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
       doc.text("DESCRIPTION / REQUIREMENT", 16, y + 5.5);
-      doc.text("QTY", 130, y + 5.5, { align: 'center' });
-      doc.text("RATE (Rs.)", 160, y + 5.5, { align: 'right' });
+      doc.text("QTY", 125, y + 5.5, { align: 'center' });
+      doc.text("RATE (Rs.)", 156, y + 5.5, { align: 'right' });
       doc.text("TOTAL (Rs.)", 193, y + 5.5, { align: 'right' });
     };
 
@@ -183,10 +154,10 @@ window.PdfGenerator = {
     const selectedItems = (quotationData.items || []).filter(item => item.selected);
 
     selectedItems.forEach((item) => {
-      // Check overflow: if exceeds page 2, start a Normal Page (NOT Letterhead)
-      if (yPos + rowHeight > (doc.internal.getNumberOfPages() === 2 ? maxPage2Y : pageHeight - 25)) {
-        startNormalPage("QUOTATION DETAILS");
-        yPos = 26;
+      // If table overflows Page 2, start Page 3 as a NORMAL CLEAN WHITE PAGE (NO letterhead graphic!)
+      if (yPos + rowHeight > (doc.internal.getNumberOfPages() === 2 ? page2MaxY : 270)) {
+        doc.addPage(); // Page 3+ (Normal Page, NO letterhead!)
+        yPos = 16;
         drawTableHeader(yPos);
         yPos += tableHeaderHeight;
       }
@@ -203,13 +174,13 @@ window.PdfGenerator = {
       doc.setFontSize(8.5);
       doc.setFont('helvetica', 'normal');
 
-      const itemName = item.name.length > 46 ? item.name.substring(0, 43) + '...' : item.name;
+      const itemName = item.name.length > 44 ? item.name.substring(0, 41) + '...' : item.name;
       doc.text(itemName, 16, yPos + 5);
 
-      doc.text(String(item.quantity || 1), 130, yPos + 5, { align: 'center' });
+      doc.text(String(item.quantity || 1), 125, yPos + 5, { align: 'center' });
 
       const unitPriceStr = (item.unitPrice || 0).toLocaleString('en-IN');
-      doc.text(unitPriceStr, 160, yPos + 5, { align: 'right' });
+      doc.text(unitPriceStr, 156, yPos + 5, { align: 'right' });
 
       const lineTotal = (item.quantity || 1) * (item.unitPrice || 0);
       grandTotal += lineTotal;
@@ -219,21 +190,22 @@ window.PdfGenerator = {
       rowIndex++;
     });
 
-    // Financial Summary Box (Fixed Alignment so numbers sit perfectly inside)
-    if (yPos + 34 > (doc.internal.getNumberOfPages() === 2 ? maxPage2Y : pageHeight - 25)) {
-      startNormalPage("QUOTATION SUMMARY");
-      yPos = 26;
+
+    // 3. Financial Summary Box (PERFECT ALIGNMENT inside Box - NO Overflow)
+    if (yPos + 34 > (doc.internal.getNumberOfPages() === 2 ? page2MaxY : 270)) {
+      doc.addPage(); // Normal Page (NO letterhead!)
+      yPos = 16;
     }
 
     yPos += 4;
-    const summaryBoxWidth = 92;
-    const summaryBoxX = pageWidth - 12 - summaryBoxWidth; // X = 106mm to 198mm
-    const summaryBoxHeight = 28;
+    const boxX = 95;
+    const boxW = 103; // Box spans from X = 95mm to X = 198mm
+    const boxH = 28;
 
     doc.setFillColor(240, 244, 250);
     doc.setDrawColor(0, 86, 179);
     doc.setLineWidth(0.5);
-    doc.roundedRect(summaryBoxX, yPos, summaryBoxWidth, summaryBoxHeight, 2, 2, 'FD');
+    doc.roundedRect(boxX, yPos, boxW, boxH, 2, 2, 'FD');
 
     doc.setTextColor(15, 22, 38);
     doc.setFontSize(9);
@@ -242,27 +214,28 @@ window.PdfGenerator = {
     const advancePaid = Number(quotationData.payment.advancePaid) || 0;
     const balanceAmount = grandTotal - advancePaid;
 
-    // Left labels
-    doc.text("GRAND TOTAL:", summaryBoxX + 4, yPos + 7);
-    doc.text("ADVANCE PAID:", summaryBoxX + 4, yPos + 15);
-    doc.text("BALANCE AMOUNT:", summaryBoxX + 4, yPos + 23);
+    // Left labels inside summary box
+    doc.text("GRAND TOTAL:", boxX + 4, yPos + 7);
+    doc.text("ADVANCE PAID:", boxX + 4, yPos + 15);
+    doc.text("BALANCE AMOUNT:", boxX + 4, yPos + 23);
 
-    // Right values (aligned cleanly at X = 193mm inside the box)
-    const rightValX = summaryBoxX + summaryBoxWidth - 5; // 193mm
+    // Right values inside summary box (Right aligned at X = 188mm, giving 10mm padding inside right edge)
+    const rightValX = boxX + boxW - 10; // 188mm
 
-    doc.text(formatCurrency(grandTotal), rightValX, yPos + 7, { align: 'right' });
+    doc.text(formatRs(grandTotal), rightValX, yPos + 7, { align: 'right' });
 
     doc.setTextColor(0, 140, 0);
-    doc.text(formatCurrency(advancePaid), rightValX, yPos + 15, { align: 'right' });
+    doc.text(formatRs(advancePaid), rightValX, yPos + 15, { align: 'right' });
 
     doc.setTextColor(200, 0, 0);
-    doc.text(formatCurrency(balanceAmount), rightValX, yPos + 23, { align: 'right' });
+    doc.text(formatRs(balanceAmount), rightValX, yPos + 23, { align: 'right' });
 
-    // Special Instructions & Important Note
-    yPos += summaryBoxHeight + 6;
-    if (yPos + 24 > (doc.internal.getNumberOfPages() === 2 ? maxPage2Y : pageHeight - 25)) {
-      startNormalPage("SPECIAL INSTRUCTIONS");
-      yPos = 26;
+
+    // 4. Special Instructions & Important Note
+    yPos += boxH + 6;
+    if (yPos + 24 > (doc.internal.getNumberOfPages() === 2 ? page2MaxY : 270)) {
+      doc.addPage(); // Normal Page (NO letterhead!)
+      yPos = 16;
     }
 
     if (quotationData.specialInstructions) {
@@ -272,7 +245,7 @@ window.PdfGenerator = {
       doc.text("SPECIAL INSTRUCTIONS:", 14, yPos);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(60, 60, 60);
-      const splitLines = doc.splitTextToSize(quotationData.specialInstructions, pageWidth - 30);
+      const splitLines = doc.splitTextToSize(quotationData.specialInstructions, pageWidth - 28);
       doc.text(splitLines, 14, yPos + 4.5);
       yPos += (splitLines.length * 4) + 6;
     }
@@ -288,7 +261,7 @@ window.PdfGenerator = {
 
 
     // ----------------------------------------------------
-    // DEDICATED PHOTO GALLERY PAGES (Normal Pages - 4 photos per page)
+    // PHOTO GALLERY PAGES (Page 3+ - NORMAL CLEAN WHITE PAGES ONLY)
     // ----------------------------------------------------
     const photos = quotationData.images || [];
 
@@ -297,34 +270,32 @@ window.PdfGenerator = {
       const totalPhotoPages = Math.ceil(photos.length / photosPerPage);
 
       for (let pIndex = 0; pIndex < totalPhotoPages; pIndex++) {
-        // Always use Normal Page (Clean white page with header) for photo gallery
-        startNormalPage(`CONCEPT PHOTOS (${pIndex + 1}/${totalPhotoPages})`);
+        // ALWAYS ADD A NORMAL CLEAN WHITE PAGE (NO letterhead template background!)
+        doc.addPage();
 
         doc.setFillColor(0, 86, 179);
-        doc.rect(12, 26, pageWidth - 24, 8, 'F');
+        doc.rect(12, 12, pageWidth - 24, 8, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(9.5);
         doc.setFont('helvetica', 'bold');
-        doc.text(`EVENT CONCEPT & DECORATION PHOTOS (Page ${pIndex + 1} of ${totalPhotoPages})`, pageWidth / 2, 31.5, { align: 'center' });
+        doc.text(`EVENT CONCEPT & DECORATION PHOTOS (Page ${pIndex + 1} of ${totalPhotoPages})`, pageWidth / 2, 17.5, { align: 'center' });
 
         const pagePhotos = photos.slice(pIndex * photosPerPage, (pIndex + 1) * photosPerPage);
 
-        // 2x2 Grid Layout
         const gridPositions = [
-          { x: 14, y: 38 },
-          { x: 109, y: 38 },
-          { x: 14, y: 154 },
-          { x: 109, y: 154 }
+          { x: 14, y: 24 },
+          { x: 109, y: 24 },
+          { x: 14, y: 146 },
+          { x: 109, y: 146 }
         ];
 
         const imgWidth = 87;
-        const imgHeight = 92;
+        const imgHeight = 98;
 
         for (let i = 0; i < pagePhotos.length; i++) {
           const photoData = pagePhotos[i];
           const pos = gridPositions[i];
 
-          // Outer Card
           doc.setFillColor(248, 250, 254);
           doc.setDrawColor(210, 220, 235);
           doc.setLineWidth(0.4);
@@ -336,7 +307,6 @@ window.PdfGenerator = {
             console.error('Error adding photo to PDF:', e);
           }
 
-          // Caption Box
           doc.setFillColor(15, 22, 38);
           doc.rect(pos.x + 2, pos.y + imgHeight, imgWidth - 4, 16, 'F');
 
