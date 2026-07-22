@@ -1,0 +1,13 @@
+{
+  "name": "white-angel-quotation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "White Angel Events - Quotation Maker System",
+  "main": "index.html",
+  "scripts": {
+    "build": "echo 'Static site ready'"
+  },
+  "keywords": ["event-management", "quotation-maker", "pdf-generator", "white-angel-events"],
+  "author": "White Angel Events",
+  "license": "MIT"
+}
