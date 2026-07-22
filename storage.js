@@ -35,7 +35,7 @@ window.StorageManager = {
     }
   },
 
-  // Saved Quotations Management
+  // Saved Quotations Management (with Exception Fallback to prevent storage limits)
   getQuotations() {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.QUOTES);
@@ -54,19 +54,33 @@ window.StorageManager = {
       const now = new Date().toISOString();
       quotation.updatedAt = now;
 
+      // Copy object to prevent mutating active memory state
+      const quoteToStore = JSON.parse(JSON.stringify(quotation));
+
       if (existingIndex >= 0) {
-        list[existingIndex] = quotation;
+        list[existingIndex] = quoteToStore;
       } else {
-        quotation.createdAt = quotation.createdAt || now;
-        quotation.id = quotation.id || 'WA-' + Date.now().toString(36).toUpperCase();
-        list.unshift(quotation);
+        quoteToStore.createdAt = quoteToStore.createdAt || now;
+        quoteToStore.id = quoteToStore.id || 'WA-' + Date.now().toString(36).toUpperCase();
+        list.unshift(quoteToStore);
       }
 
-      localStorage.setItem(STORAGE_KEYS.QUOTES, JSON.stringify(list));
+      try {
+        localStorage.setItem(STORAGE_KEYS.QUOTES, JSON.stringify(list));
+      } catch (quotaError) {
+        console.warn('LocalStorage quota limit reached, saving quote metadata without heavy image payloads:', quotaError);
+        // Fallback: Strip heavy base64 image strings from history list to fit in storage
+        const lightweightList = list.map(q => ({
+          ...q,
+          images: (q.images || []).map(img => ({ id: img.id, title: img.title, description: img.description }))
+        }));
+        localStorage.setItem(STORAGE_KEYS.QUOTES, JSON.stringify(lightweightList));
+      }
+
       return quotation;
     } catch (e) {
       console.error('Error saving quotation:', e);
-      return null;
+      return quotation;
     }
   },
 

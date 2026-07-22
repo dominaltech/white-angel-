@@ -173,27 +173,58 @@ window.BillTab = {
     document.getElementById('displayBalance').textContent = '₹ ' + balance.toLocaleString('en-IN');
   },
 
-  // Unlimited Multi-Image Upload Handler
+  // Fast Canvas Image Compressor (resizes to max 1200px & 0.75 JPEG to prevent memory & localStorage limits)
+  compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.75) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = () => resolve(e.target.result);
+        img.src = e.target.result;
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  },
+
+  // Unlimited Multi-Image Upload Handler with Automatic Compression
   async handleImageUpload(files) {
     const fileList = Array.from(files).filter(file => file.type.startsWith('image/'));
     if (fileList.length === 0) return;
 
-    window.App.showToast(`Uploading ${fileList.length} photo(s)...`, 'info');
-
-    const readAsDataURL = (file) => new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(file);
-    });
+    window.App.showToast(`Processing & optimizing ${fileList.length} photo(s)...`, 'info');
 
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
-      const dataUrl = await readAsDataURL(file);
-      if (dataUrl) {
+      const compressedDataUrl = await this.compressImage(file);
+      if (compressedDataUrl) {
         this.uploadedImages.push({
           id: 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-          src: dataUrl,
+          src: compressedDataUrl,
           title: file.name.replace(/\.[^/.]+$/, ""),
           description: 'Event Decoration Concept Reference'
         });
@@ -201,7 +232,7 @@ window.BillTab = {
     }
 
     this.renderUploadedImages();
-    window.App.showToast(`Total ${this.uploadedImages.length} photos added!`, 'success');
+    window.App.showToast(`Total ${this.uploadedImages.length} photos ready for PDF!`, 'success');
   },
 
   renderUploadedImages() {
@@ -246,16 +277,13 @@ window.BillTab = {
   getQuotationData() {
     const rates = window.StorageManager.getRates();
 
-    // Selected Function Checkboxes
     const selectedFunctions = [];
     document.querySelectorAll('.function-checkbox:checked').forEach(cb => {
       selectedFunctions.push(cb.value);
     });
 
-    // Items List
     const items = [];
 
-    // Checkpoint Items
     document.querySelectorAll('.item-row').forEach(row => {
       const selected = row.querySelector('.item-checkbox').checked;
       const name = row.querySelector('.item-title-input').value;
@@ -273,7 +301,6 @@ window.BillTab = {
       });
     });
 
-    // Catering Items
     const vegCount = parseInt(document.getElementById('catVegGuests')?.value) || 0;
     if (vegCount > 0) {
       items.push({
@@ -324,7 +351,6 @@ window.BillTab = {
       }
     }
 
-    // Accommodation
     const roomsCount = parseInt(document.getElementById('accRoomsCount')?.value) || 0;
     const hotelName = document.getElementById('accHotelName')?.value || '';
     if (roomsCount > 0) {
@@ -366,7 +392,7 @@ window.BillTab = {
     };
   },
 
-  // Save Quotation
+  // Save Quotation with exception fallback
   saveQuotation(e) {
     if (e && e.preventDefault) e.preventDefault();
 
@@ -377,7 +403,7 @@ window.BillTab = {
       window.App.showToast(`Quotation ${saved.id} saved!`, 'success');
       if (window.SummaryTab) window.SummaryTab.loadQuotations();
     }
-    return saved;
+    return data; // Always return active data for PDF generation!
   },
 
   // Generate PDF
@@ -387,7 +413,7 @@ window.BillTab = {
     const data = this.saveQuotation();
     if (!data) return;
 
-    window.App.showToast('Generating multi-page PDF...', 'info');
+    window.App.showToast(`Generating PDF (${data.images.length} photos)...`, 'info');
 
     try {
       const doc = await window.PdfGenerator.generatePdf(data);
