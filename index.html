@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>White Angel Events - Quotation Maker System</title>
   <meta name="description" content="Professional event quotation generator for White Angel Events. Create, save, edit, and send high-quality event requirement PDFs via WhatsApp.">
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="stylesheet" href="styles.css?v=4">
   <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -304,7 +304,7 @@
         </div>
       </section>
 
-      <!-- 8. Financial Summary, Budget & Notes -->
+      <!-- 8. Financial Summary, Budget, Discount & Notes -->
       <section class="card-section" style="border-color: rgba(0, 136, 255, 0.4);">
         <div class="section-header">
           <h2>
@@ -320,12 +320,22 @@
           </div>
 
           <div class="form-group">
+            <label for="discountPercentInput">Discount (%)</label>
+            <input type="number" id="discountPercentInput" class="form-input" placeholder="0" min="0" max="100" step="1" onchange="window.BillTab.recalculateTotals()" onkeyup="window.BillTab.recalculateTotals()">
+          </div>
+
+          <div class="form-group">
             <label for="advancePaidInput">Advance Paid (₹)</label>
-            <input type="number" id="advancePaidInput" class="form-input" placeholder="0" onchange="window.BillTab.recalculateTotals()">
+            <input type="number" id="advancePaidInput" class="form-input" placeholder="0" onchange="window.BillTab.recalculateTotals()" onkeyup="window.BillTab.recalculateTotals()">
           </div>
 
           <div class="form-group" style="background: #080d19; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-            <div style="font-size: 0.78rem; color: var(--text-muted);">GRAND TOTAL</div>
+            <div style="font-size: 0.78rem; color: var(--text-muted);">SUBTOTAL</div>
+            <div id="displaySubtotal" style="font-size: 1.15rem; font-weight: 700; color: #94a3b8;">₹ 0</div>
+          </div>
+
+          <div class="form-group" style="background: #080d19; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.78rem; color: var(--text-muted);">FINAL GRAND TOTAL</div>
             <div id="displayGrandTotal" style="font-size: 1.35rem; font-weight: 800; color: var(--accent-cyan);">₹ 0</div>
           </div>
 
@@ -479,14 +489,14 @@
   </main>
 
   <!-- JS Modules -->
-  <script src="assets.js?v=3"></script>
-  <script src="data.js?v=3"></script>
-  <script src="storage.js?v=3"></script>
-  <script src="pdfGenerator.js?v=3"></script>
-  <script src="billTab.js?v=3"></script>
-  <script src="summaryTab.js?v=3"></script>
-  <script src="manageTab.js?v=3"></script>
-  <script src="app.js?v=3"></script>
+  <script src="assets.js?v=4"></script>
+  <script src="data.js?v=4"></script>
+  <script src="storage.js?v=4"></script>
+  <script src="pdfGenerator.js?v=4"></script>
+  <script src="billTab.js?v=4"></script>
+  <script src="summaryTab.js?v=4"></script>
+  <script src="manageTab.js?v=4"></script>
+  <script src="app.js?v=4"></script>
 
 </body>
 </html>

@@ -119,7 +119,7 @@ window.BillTab = {
 
   recalculateTotals() {
     const rates = window.StorageManager.getRates();
-    let total = 0;
+    let subtotal = 0;
 
     // 1. Checkpoint Rows (Decoration, Photography, Transport, Custom)
     const rows = document.querySelectorAll('.item-row');
@@ -129,7 +129,7 @@ window.BillTab = {
         row.classList.add('selected');
         const qty = parseInt(row.querySelector('.qty-input').value) || 1;
         const price = parseFloat(row.querySelector('.item-price-input').value) || 0;
-        total += (qty * price);
+        subtotal += (qty * price);
       } else {
         row.classList.remove('selected');
       }
@@ -138,42 +138,54 @@ window.BillTab = {
     // 2. Catering Calculation
     const vegCount = parseInt(document.getElementById('catVegGuests')?.value) || 0;
     const vegTotal = vegCount * rates.catering.vegPerPlate;
-    document.getElementById('catVegTotal').textContent = '₹ ' + vegTotal.toLocaleString('en-IN');
-    total += vegTotal;
+    if (document.getElementById('catVegTotal')) document.getElementById('catVegTotal').textContent = '₹ ' + vegTotal.toLocaleString('en-IN');
+    subtotal += vegTotal;
 
     const nonVegCount = parseInt(document.getElementById('catNonVegGuests')?.value) || 0;
     const nonVegTotal = nonVegCount * rates.catering.nonVegPerPlate;
-    document.getElementById('catNonVegTotal').textContent = '₹ ' + nonVegTotal.toLocaleString('en-IN');
-    total += nonVegTotal;
+    if (document.getElementById('catNonVegTotal')) document.getElementById('catNonVegTotal').textContent = '₹ ' + nonVegTotal.toLocaleString('en-IN');
+    subtotal += nonVegTotal;
 
     const sweetCount = parseInt(document.getElementById('catSweetsCount')?.value) || 0;
     const sweetTotal = sweetCount * rates.catering.sweetPerPlate;
-    document.getElementById('catSweetsTotal').textContent = '₹ ' + sweetTotal.toLocaleString('en-IN');
-    total += sweetTotal;
+    if (document.getElementById('catSweetsTotal')) document.getElementById('catSweetsTotal').textContent = '₹ ' + sweetTotal.toLocaleString('en-IN');
+    subtotal += sweetTotal;
 
     // Live Counters
     for (let i = 1; i <= 5; i++) {
       const input = document.getElementById(`catLiveCounter_${i}`);
       if (input && input.value.trim() !== '') {
-        total += rates.catering.liveCounterPerUnit;
+        subtotal += rates.catering.liveCounterPerUnit;
       }
     }
 
     // 3. Accommodation Calculation
     const roomsCount = parseInt(document.getElementById('accRoomsCount')?.value) || 0;
     const roomsTotal = roomsCount * rates.accommodation.perRoomPrice;
-    document.getElementById('accRoomsTotal').textContent = '₹ ' + roomsTotal.toLocaleString('en-IN');
-    total += roomsTotal;
+    if (document.getElementById('accRoomsTotal')) document.getElementById('accRoomsTotal').textContent = '₹ ' + roomsTotal.toLocaleString('en-IN');
+    subtotal += roomsTotal;
 
-    // 4. Update Summary Displays
-    document.getElementById('displayGrandTotal').textContent = '₹ ' + total.toLocaleString('en-IN');
+    // 4. Discount Percentage & Amount Calculation
+    const discountPercent = Math.max(0, Math.min(100, parseFloat(document.getElementById('discountPercentInput')?.value) || 0));
+    const discountAmount = Math.round((subtotal * discountPercent) / 100);
+    const grandTotal = Math.max(0, subtotal - discountAmount);
 
     const advancePaid = parseFloat(document.getElementById('advancePaidInput')?.value) || 0;
-    const balance = total - advancePaid;
-    document.getElementById('displayBalance').textContent = '₹ ' + balance.toLocaleString('en-IN');
+    const balance = grandTotal - advancePaid;
+
+    // Update Displays
+    if (document.getElementById('displaySubtotal')) {
+      document.getElementById('displaySubtotal').textContent = '₹ ' + subtotal.toLocaleString('en-IN');
+    }
+    if (document.getElementById('displayGrandTotal')) {
+      document.getElementById('displayGrandTotal').textContent = '₹ ' + grandTotal.toLocaleString('en-IN') + (discountPercent > 0 ? ` (${discountPercent}% OFF)` : '');
+    }
+    if (document.getElementById('displayBalance')) {
+      document.getElementById('displayBalance').textContent = '₹ ' + balance.toLocaleString('en-IN');
+    }
   },
 
-  // Fast Canvas Image Compressor (resizes to max 1200px & 0.75 JPEG to prevent memory & localStorage limits)
+  // Fast Canvas Image Compressor
   compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.75) {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -211,7 +223,7 @@ window.BillTab = {
     });
   },
 
-  // Unlimited Multi-Image Upload Handler with Automatic Compression
+  // Multi-Image Upload Handler
   async handleImageUpload(files) {
     const fileList = Array.from(files).filter(file => file.type.startsWith('image/'));
     if (fileList.length === 0) return;
@@ -283,6 +295,7 @@ window.BillTab = {
     });
 
     const items = [];
+    let subtotal = 0;
 
     document.querySelectorAll('.item-row').forEach(row => {
       const selected = row.querySelector('.item-checkbox').checked;
@@ -290,6 +303,8 @@ window.BillTab = {
       const quantity = parseInt(row.querySelector('.qty-input').value) || 1;
       const unitPrice = parseFloat(row.querySelector('.item-price-input').value) || 0;
       const category = row.getAttribute('data-category') || 'general';
+
+      if (selected) subtotal += (quantity * unitPrice);
 
       items.push({
         id: row.getAttribute('data-id'),
@@ -303,6 +318,7 @@ window.BillTab = {
 
     const vegCount = parseInt(document.getElementById('catVegGuests')?.value) || 0;
     if (vegCount > 0) {
+      subtotal += (vegCount * rates.catering.vegPerPlate);
       items.push({
         id: 'cat_veg',
         category: 'catering',
@@ -315,6 +331,7 @@ window.BillTab = {
 
     const nonVegCount = parseInt(document.getElementById('catNonVegGuests')?.value) || 0;
     if (nonVegCount > 0) {
+      subtotal += (nonVegCount * rates.catering.nonVegPerPlate);
       items.push({
         id: 'cat_nonveg',
         category: 'catering',
@@ -327,6 +344,7 @@ window.BillTab = {
 
     const sweetCount = parseInt(document.getElementById('catSweetsCount')?.value) || 0;
     if (sweetCount > 0) {
+      subtotal += (sweetCount * rates.catering.sweetPerPlate);
       items.push({
         id: 'cat_sweets',
         category: 'catering',
@@ -340,6 +358,7 @@ window.BillTab = {
     for (let i = 1; i <= 5; i++) {
       const input = document.getElementById(`catLiveCounter_${i}`);
       if (input && input.value.trim() !== '') {
+        subtotal += rates.catering.liveCounterPerUnit;
         items.push({
           id: `cat_live_${i}`,
           category: 'catering',
@@ -354,6 +373,7 @@ window.BillTab = {
     const roomsCount = parseInt(document.getElementById('accRoomsCount')?.value) || 0;
     const hotelName = document.getElementById('accHotelName')?.value || '';
     if (roomsCount > 0) {
+      subtotal += (roomsCount * rates.accommodation.perRoomPrice);
       items.push({
         id: 'acc_rooms',
         category: 'accommodation',
@@ -363,6 +383,11 @@ window.BillTab = {
         selected: true
       });
     }
+
+    const discountPercent = Math.max(0, Math.min(100, parseFloat(document.getElementById('discountPercentInput')?.value) || 0));
+    const discountAmount = Math.round((subtotal * discountPercent) / 100);
+    const grandTotal = Math.max(0, subtotal - discountAmount);
+    const advancePaid = parseFloat(document.getElementById('advancePaidInput')?.value) || 0;
 
     return {
       id: this.currentQuotationId || ('WA-' + Date.now().toString(36).toUpperCase()),
@@ -385,14 +410,19 @@ window.BillTab = {
       items,
       images: this.uploadedImages,
       payment: {
+        subtotal,
+        discountPercent,
+        discountAmount,
         estimatedBudget: parseFloat(document.getElementById('estimatedBudgetInput')?.value) || 0,
-        advancePaid: parseFloat(document.getElementById('advancePaidInput')?.value) || 0
+        advancePaid,
+        grandTotal,
+        balanceAmount: grandTotal - advancePaid
       },
       specialInstructions: document.getElementById('specialInstructionsInput')?.value || ''
     };
   },
 
-  // Save Quotation with exception fallback
+  // Save Quotation
   saveQuotation(e) {
     if (e && e.preventDefault) e.preventDefault();
 
@@ -403,7 +433,7 @@ window.BillTab = {
       window.App.showToast(`Quotation ${saved.id} saved!`, 'success');
       if (window.SummaryTab) window.SummaryTab.loadQuotations();
     }
-    return data; // Always return active data for PDF generation!
+    return data;
   },
 
   // Generate PDF
@@ -437,11 +467,8 @@ window.BillTab = {
     const phone = data.clientDetails.mobileNumber.replace(/\D/g, '');
     const clientName = [data.clientDetails.groomName, data.clientDetails.brideName].filter(Boolean).join(' & ') || 'Client';
 
-    let grandTotal = 0;
-    data.items.filter(i => i.selected).forEach(i => {
-      grandTotal += (i.quantity * i.unitPrice);
-    });
-    const balance = grandTotal - (data.payment.advancePaid || 0);
+    const subtotal = data.payment.subtotal || 0;
+    const discountStr = data.payment.discountPercent > 0 ? `\n*Discount (${data.payment.discountPercent}%):* -Rs. ${data.payment.discountAmount.toLocaleString('en-IN')}` : '';
 
     const message = `*WHITE ANGEL EVENTS* - Quotation Details 🌸
 -------------------------------------
@@ -451,9 +478,10 @@ window.BillTab = {
 *Venue:* ${data.eventDetails.venueName || 'TBD'}
 *Functions:* ${(data.selectedFunctions || []).join(', ') || 'Wedding Event'}
 
-*Grand Total:* Rs. ${grandTotal.toLocaleString('en-IN')}
+*Subtotal:* Rs. ${subtotal.toLocaleString('en-IN')}${discountStr}
+*Grand Total:* Rs. ${data.payment.grandTotal.toLocaleString('en-IN')}
 *Advance Paid:* Rs. ${(data.payment.advancePaid || 0).toLocaleString('en-IN')}
-*Balance Amount:* Rs. ${balance.toLocaleString('en-IN')}
+*Balance Amount:* Rs. ${data.payment.balanceAmount.toLocaleString('en-IN')}
 
 Thank you for choosing White Angel Events!
 _Creating Moments, Building Memories_ 💖`;
@@ -474,7 +502,7 @@ _Creating Moments, Building Memories_ 💖`;
       ['groomName', 'brideName', 'mobileNumber', 'alternateNumber', 'clientAddress', 'clientEmail', 
        'weddingDate', 'venueName', 'venueAddress', 'eventTime', 'guestCount', 
        'catVegGuests', 'catNonVegGuests', 'catSweetsCount', 'accRoomsCount', 'accHotelName',
-       'estimatedBudgetInput', 'advancePaidInput', 'specialInstructionsInput'].forEach(id => {
+       'estimatedBudgetInput', 'discountPercentInput', 'advancePaidInput', 'specialInstructionsInput'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
       });
@@ -537,8 +565,9 @@ _Creating Moments, Building Memories_ 💖`;
     const sweetItem = (quotation.items || []).find(i => i.id === 'cat_sweets');
     if (sweetItem && document.getElementById('catSweetsCount')) document.getElementById('catSweetsCount').value = sweetItem.quantity;
 
-    // Payments
+    // Payments & Discount
     if (document.getElementById('estimatedBudgetInput')) document.getElementById('estimatedBudgetInput').value = quotation.payment?.estimatedBudget || 0;
+    if (document.getElementById('discountPercentInput')) document.getElementById('discountPercentInput').value = quotation.payment?.discountPercent || 0;
     if (document.getElementById('advancePaidInput')) document.getElementById('advancePaidInput').value = quotation.payment?.advancePaid || 0;
 
     // Special Instructions
