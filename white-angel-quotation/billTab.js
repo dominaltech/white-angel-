@@ -173,35 +173,52 @@ window.BillTab = {
     document.getElementById('displayBalance').textContent = '₹ ' + balance.toLocaleString('en-IN');
   },
 
-  // Image Upload Handler
-  handleImageUpload(files) {
-    Array.from(files).forEach(file => {
-      if (!file.type.startsWith('image/')) return;
+  // Unlimited Multi-Image Upload Handler
+  async handleImageUpload(files) {
+    const fileList = Array.from(files).filter(file => file.type.startsWith('image/'));
+    if (fileList.length === 0) return;
 
+    window.App.showToast(`Uploading ${fileList.length} photo(s)...`, 'info');
+
+    const readAsDataURL = (file) => new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onload = (e) => {
-        const imageObj = {
-          id: 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-          src: e.target.result,
-          title: file.name.replace(/\.[^/.]+$/, ""),
-          description: 'Event Decoration Concept Reference'
-        };
-        this.uploadedImages.push(imageObj);
-        this.renderUploadedImages();
-      };
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = () => resolve(null);
       reader.readAsDataURL(file);
     });
+
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      const dataUrl = await readAsDataURL(file);
+      if (dataUrl) {
+        this.uploadedImages.push({
+          id: 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+          src: dataUrl,
+          title: file.name.replace(/\.[^/.]+$/, ""),
+          description: 'Event Decoration Concept Reference'
+        });
+      }
+    }
+
+    this.renderUploadedImages();
+    window.App.showToast(`Total ${this.uploadedImages.length} photos added!`, 'success');
   },
 
   renderUploadedImages() {
     const grid = document.getElementById('uploadedImagesGrid');
     if (!grid) return;
 
+    if (this.uploadedImages.length === 0) {
+      grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 12px;">No concept photos uploaded yet. Click or drop images above to attach them to the PDF (4 photos per page).</div>`;
+      return;
+    }
+
     grid.innerHTML = this.uploadedImages.map((img, idx) => {
       const pageNum = Math.floor(idx / 4) + 1;
+      const photoSlot = (idx % 4) + 1;
       return `
         <div class="image-preview-card" data-id="${img.id}">
-          <span class="page-badge">Photo Page ${pageNum}</span>
+          <span class="page-badge">Photo Page ${pageNum} (${photoSlot}/4)</span>
           <button type="button" class="card-remove-btn" onclick="window.BillTab.removeUploadedImage('${img.id}')">&times;</button>
           <img src="${img.src}" alt="Event Photo">
           <div class="image-card-body">
@@ -229,7 +246,7 @@ window.BillTab = {
   getQuotationData() {
     const rates = window.StorageManager.getRates();
 
-    // Functions
+    // Selected Function Checkboxes
     const selectedFunctions = [];
     document.querySelectorAll('.function-checkbox:checked').forEach(cb => {
       selectedFunctions.push(cb.value);
@@ -349,7 +366,7 @@ window.BillTab = {
     };
   },
 
-  // Save Quotation to Storage (Preserves Form Fields!)
+  // Save Quotation
   saveQuotation(e) {
     if (e && e.preventDefault) e.preventDefault();
 
@@ -363,18 +380,19 @@ window.BillTab = {
     return saved;
   },
 
-  // Generate & Download PDF (Preserves Form Fields!)
+  // Generate PDF
   async generatePdf(e) {
     if (e && e.preventDefault) e.preventDefault();
 
     const data = this.saveQuotation();
     if (!data) return;
 
-    window.App.showToast('Generating high quality PDF...', 'info');
+    window.App.showToast('Generating multi-page PDF...', 'info');
 
     try {
       const doc = await window.PdfGenerator.generatePdf(data);
-      const filename = `White_Angel_Quotation_${data.clientDetails.groomName || data.clientDetails.brideName || 'Client'}_${data.id}.pdf`;
+      const clientName = [data.clientDetails.groomName, data.clientDetails.brideName].filter(Boolean).join('_') || 'Client';
+      const filename = `White_Angel_Quotation_${clientName}_${data.id}.pdf`;
       doc.save(filename);
       window.App.showToast('PDF generated and downloaded!', 'success');
     } catch (err) {
@@ -383,7 +401,7 @@ window.BillTab = {
     }
   },
 
-  // Send via WhatsApp (Preserves Form Fields!)
+  // Send WhatsApp
   sendWhatsApp(e) {
     if (e && e.preventDefault) e.preventDefault();
 
@@ -405,10 +423,11 @@ window.BillTab = {
 *Client:* ${clientName}
 *Event Date:* ${data.eventDetails.weddingDate || 'TBD'}
 *Venue:* ${data.eventDetails.venueName || 'TBD'}
+*Functions:* ${(data.selectedFunctions || []).join(', ') || 'Wedding Event'}
 
-*Estimated Total:* ₹ ${grandTotal.toLocaleString('en-IN')}
-*Advance Paid:* ₹ ${(data.payment.advancePaid || 0).toLocaleString('en-IN')}
-*Balance Amount:* ₹ ${balance.toLocaleString('en-IN')}
+*Grand Total:* Rs. ${grandTotal.toLocaleString('en-IN')}
+*Advance Paid:* Rs. ${(data.payment.advancePaid || 0).toLocaleString('en-IN')}
+*Balance Amount:* Rs. ${balance.toLocaleString('en-IN')}
 
 Thank you for choosing White Angel Events!
 _Creating Moments, Building Memories_ 💖`;
@@ -419,14 +438,13 @@ _Creating Moments, Building Memories_ 💖`;
     window.open(whatsappUrl, '_blank');
   },
 
-  // Reset Form for a New Blank Quote
+  // Reset Form
   resetForm() {
     if (confirm('Clear current form to create a new blank quotation?')) {
       this.currentQuotationId = null;
       this.uploadedImages = [];
       this.renderForm();
       
-      // Clear inputs
       ['groomName', 'brideName', 'mobileNumber', 'alternateNumber', 'clientAddress', 'clientEmail', 
        'weddingDate', 'venueName', 'venueAddress', 'eventTime', 'guestCount', 
        'catVegGuests', 'catNonVegGuests', 'catSweetsCount', 'accRoomsCount', 'accHotelName',
