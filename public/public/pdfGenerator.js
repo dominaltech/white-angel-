@@ -114,18 +114,15 @@ window.PdfGenerator = {
     doc.text(`Guest Count: ${quotationData.eventDetails.guestCount || '-'}`, col2X, yPos + 19);
     doc.text(`Event Time: ${quotationData.eventDetails.eventTime || '-'}`, col2X, yPos + 25);
 
-    // Event / Function Type(s) Highlight - WHITE BACKGROUND AS REQUESTED
+    // Event / Function Type(s) Highlight
     const functionsStr = (quotationData.selectedFunctions && quotationData.selectedFunctions.length > 0)
       ? quotationData.selectedFunctions.join(', ')
       : 'Wedding Event';
 
-    doc.setFillColor(255, 255, 255); // Pure White Background
-    doc.setDrawColor(210, 225, 245);
-    doc.setLineWidth(0.4);
-    doc.roundedRect(13, yPos + 29, pageWidth - 26, 11, 1, 1, 'FD');
-
+    doc.setFillColor(0, 86, 179, 0.08);
+    doc.rect(13, yPos + 29, pageWidth - 26, 11, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 86, 179); // Deep Royal Blue Text
+    doc.setTextColor(0, 86, 179);
     doc.text(`EVENT / FUNCTION TYPE(S): ${functionsStr.toUpperCase()}`, col1X, yPos + 36);
 
     yPos += 48;
@@ -151,12 +148,13 @@ window.PdfGenerator = {
     drawTableHeader(yPos);
     yPos += tableHeaderHeight;
 
-    let calculatedSubtotal = 0;
+    let grandTotal = 0;
     let rowIndex = 0;
 
     const selectedItems = (quotationData.items || []).filter(item => item.selected);
 
     selectedItems.forEach((item) => {
+      // If table overflows Page 2, start Page 3 as a NORMAL CLEAN WHITE PAGE (NO letterhead graphic!)
       if (yPos + rowHeight > (doc.internal.getNumberOfPages() === 2 ? page2MaxY : 270)) {
         doc.addPage(); // Page 3+ (Normal Page, NO letterhead!)
         yPos = 16;
@@ -185,7 +183,7 @@ window.PdfGenerator = {
       doc.text(unitPriceStr, 156, yPos + 5, { align: 'right' });
 
       const lineTotal = (item.quantity || 1) * (item.unitPrice || 0);
-      calculatedSubtotal += lineTotal;
+      grandTotal += lineTotal;
       doc.text(lineTotal.toLocaleString('en-IN'), 193, yPos + 5, { align: 'right' });
 
       yPos += rowHeight;
@@ -193,17 +191,8 @@ window.PdfGenerator = {
     });
 
 
-    // 3. Financial Summary Box (Includes Discount line if applied)
-    const discountPercent = Number(quotationData.payment?.discountPercent) || 0;
-    const discountAmount = Math.round((calculatedSubtotal * discountPercent) / 100);
-    const grandTotal = Math.max(0, calculatedSubtotal - discountAmount);
-    const advancePaid = Number(quotationData.payment?.advancePaid) || 0;
-    const balanceAmount = grandTotal - advancePaid;
-
-    const hasDiscount = discountPercent > 0;
-    const boxH = hasDiscount ? 36 : 28;
-
-    if (yPos + boxH + 6 > (doc.internal.getNumberOfPages() === 2 ? page2MaxY : 270)) {
+    // 3. Financial Summary Box (PERFECT ALIGNMENT inside Box - NO Overflow)
+    if (yPos + 34 > (doc.internal.getNumberOfPages() === 2 ? page2MaxY : 270)) {
       doc.addPage(); // Normal Page (NO letterhead!)
       yPos = 16;
     }
@@ -211,6 +200,7 @@ window.PdfGenerator = {
     yPos += 4;
     const boxX = 95;
     const boxW = 103; // Box spans from X = 95mm to X = 198mm
+    const boxH = 28;
 
     doc.setFillColor(240, 244, 250);
     doc.setDrawColor(0, 86, 179);
@@ -218,45 +208,27 @@ window.PdfGenerator = {
     doc.roundedRect(boxX, yPos, boxW, boxH, 2, 2, 'FD');
 
     doc.setTextColor(15, 22, 38);
-    doc.setFontSize(8.5);
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
 
+    const advancePaid = Number(quotationData.payment.advancePaid) || 0;
+    const balanceAmount = grandTotal - advancePaid;
+
+    // Left labels inside summary box
+    doc.text("GRAND TOTAL:", boxX + 4, yPos + 7);
+    doc.text("ADVANCE PAID:", boxX + 4, yPos + 15);
+    doc.text("BALANCE AMOUNT:", boxX + 4, yPos + 23);
+
+    // Right values inside summary box (Right aligned at X = 188mm, giving 10mm padding inside right edge)
     const rightValX = boxX + boxW - 10; // 188mm
 
-    if (hasDiscount) {
-      doc.text("SUBTOTAL:", boxX + 4, yPos + 7);
-      doc.text(formatRs(calculatedSubtotal), rightValX, yPos + 7, { align: 'right' });
+    doc.text(formatRs(grandTotal), rightValX, yPos + 7, { align: 'right' });
 
-      doc.setTextColor(0, 102, 204);
-      doc.text(`DISCOUNT (${discountPercent}%):`, boxX + 4, yPos + 14);
-      doc.text(`- ${formatRs(discountAmount)}`, rightValX, yPos + 14, { align: 'right' });
+    doc.setTextColor(0, 140, 0);
+    doc.text(formatRs(advancePaid), rightValX, yPos + 15, { align: 'right' });
 
-      doc.setTextColor(15, 22, 38);
-      doc.setFontSize(9);
-      doc.text("GRAND TOTAL:", boxX + 4, yPos + 21);
-      doc.text(formatRs(grandTotal), rightValX, yPos + 21, { align: 'right' });
-
-      doc.setFontSize(8.5);
-      doc.text("ADVANCE PAID:", boxX + 4, yPos + 28);
-      doc.setTextColor(0, 140, 0);
-      doc.text(formatRs(advancePaid), rightValX, yPos + 28, { align: 'right' });
-
-      doc.setTextColor(200, 0, 0);
-      doc.setFontSize(9);
-      doc.text("BALANCE AMOUNT:", boxX + 4, yPos + 33);
-      doc.text(formatRs(balanceAmount), rightValX, yPos + 33, { align: 'right' });
-    } else {
-      doc.text("GRAND TOTAL:", boxX + 4, yPos + 7);
-      doc.text(formatRs(grandTotal), rightValX, yPos + 7, { align: 'right' });
-
-      doc.text("ADVANCE PAID:", boxX + 4, yPos + 15);
-      doc.setTextColor(0, 140, 0);
-      doc.text(formatRs(advancePaid), rightValX, yPos + 15, { align: 'right' });
-
-      doc.setTextColor(200, 0, 0);
-      doc.text("BALANCE AMOUNT:", boxX + 4, yPos + 23);
-      doc.text(formatRs(balanceAmount), rightValX, yPos + 23, { align: 'right' });
-    }
+    doc.setTextColor(200, 0, 0);
+    doc.text(formatRs(balanceAmount), rightValX, yPos + 23, { align: 'right' });
 
 
     // 4. Special Instructions & Important Note
@@ -298,7 +270,8 @@ window.PdfGenerator = {
       const totalPhotoPages = Math.ceil(photos.length / photosPerPage);
 
       for (let pIndex = 0; pIndex < totalPhotoPages; pIndex++) {
-        doc.addPage(); // Normal clean white page
+        // ALWAYS ADD A NORMAL CLEAN WHITE PAGE (NO letterhead template background!)
+        doc.addPage();
 
         doc.setFillColor(0, 86, 179);
         doc.rect(12, 12, pageWidth - 24, 8, 'F');

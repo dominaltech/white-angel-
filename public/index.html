@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>White Angel Events - Quotation Maker System</title>
   <meta name="description" content="Professional event quotation generator for White Angel Events. Create, save, edit, and send high-quality event requirement PDFs via WhatsApp.">
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="stylesheet" href="styles.css?v=6">
   <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,23 +26,30 @@
       </div>
     </div>
 
-    <!-- Desktop Menu Bar Navigation -->
-    <nav class="desktop-nav">
-      <button type="button" class="nav-btn active" data-tab="bill">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
-        <span>Bill / Quotation</span>
-      </button>
+    <!-- Right Controls: Desktop Navigation & Day/Night Theme Toggle Button -->
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <nav class="desktop-nav">
+        <button type="button" class="nav-btn active" data-tab="bill">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+          <span>Bill / Quotation</span>
+        </button>
 
-      <button type="button" class="nav-btn" data-tab="summary">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        <span>Summary</span>
-      </button>
+        <button type="button" class="nav-btn" data-tab="summary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <span>Summary</span>
+        </button>
 
-      <button type="button" class="nav-btn" data-tab="manage">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-        <span>Manage Rates</span>
+        <button type="button" class="nav-btn" data-tab="manage">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+          <span>Manage Rates</span>
+        </button>
+      </nav>
+
+      <!-- Day / Night Theme Toggle Button -->
+      <button type="button" id="themeToggleBtn" class="theme-toggle-btn" onclick="window.App.toggleTheme()" title="Toggle Day / Night Mode">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
       </button>
-    </nav>
+    </div>
   </header>
 
   <!-- Mobile Fixed Bottom Navigation Bar -->
@@ -78,7 +85,6 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             CLIENT DETAILS
           </h2>
-          <button type="button" class="btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="window.BillTab.resetForm()">+ New Blank Quote</button>
         </div>
         <div class="form-grid">
           <div class="form-group">
@@ -304,8 +310,8 @@
         </div>
       </section>
 
-      <!-- 8. Financial Summary, Budget & Notes -->
-      <section class="card-section" style="border-color: rgba(0, 136, 255, 0.4);">
+      <!-- 8. Financial Summary, Budget, Discount & Notes -->
+      <section class="card-section" style="border-color: var(--accent-cyan);">
         <div class="section-header">
           <h2>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
@@ -320,16 +326,26 @@
           </div>
 
           <div class="form-group">
-            <label for="advancePaidInput">Advance Paid (₹)</label>
-            <input type="number" id="advancePaidInput" class="form-input" placeholder="0" onchange="window.BillTab.recalculateTotals()">
+            <label for="discountPercentInput">Discount (%)</label>
+            <input type="number" id="discountPercentInput" class="form-input" placeholder="0" min="0" max="100" step="1" onchange="window.BillTab.recalculateTotals()" onkeyup="window.BillTab.recalculateTotals()">
           </div>
 
-          <div class="form-group" style="background: #080d19; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-            <div style="font-size: 0.78rem; color: var(--text-muted);">GRAND TOTAL</div>
+          <div class="form-group">
+            <label for="advancePaidInput">Advance Paid (₹)</label>
+            <input type="number" id="advancePaidInput" class="form-input" placeholder="0" onchange="window.BillTab.recalculateTotals()" onkeyup="window.BillTab.recalculateTotals()">
+          </div>
+
+          <div class="form-group" style="background: var(--summary-box-bg); padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.78rem; color: var(--text-muted);">SUBTOTAL</div>
+            <div id="displaySubtotal" style="font-size: 1.15rem; font-weight: 700; color: var(--text-muted);">₹ 0</div>
+          </div>
+
+          <div class="form-group" style="background: var(--summary-box-bg); padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.78rem; color: var(--text-muted);">FINAL GRAND TOTAL</div>
             <div id="displayGrandTotal" style="font-size: 1.35rem; font-weight: 800; color: var(--accent-cyan);">₹ 0</div>
           </div>
 
-          <div class="form-group" style="background: #080d19; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+          <div class="form-group" style="background: var(--summary-box-bg); padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
             <div style="font-size: 0.78rem; color: var(--text-muted);">BALANCE AMOUNT</div>
             <div id="displayBalance" style="font-size: 1.35rem; font-weight: 800; color: #ef4444;">₹ 0</div>
           </div>
@@ -340,22 +356,18 @@
           <textarea id="specialInstructionsInput" class="form-textarea" rows="3" placeholder="Enter special setup instructions or custom client terms..."></textarea>
         </div>
 
-        <div style="margin-top: 14px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 10px 14px; border-radius: var(--radius-md); color: #fca5a5; font-size: 0.82rem; font-weight: 600; text-align: center;">
+        <div style="margin-top: 14px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 10px 14px; border-radius: var(--radius-md); color: #ef4444; font-size: 0.82rem; font-weight: 600; text-align: center;">
           ⚠️ IMPORTANT NOTE: 80% PAYMENT MUST BE PAID 15 DAYS BEFORE OF EVENT.
         </div>
       </section>
 
       <!-- Action Buttons Bar -->
-      <div class="action-bar">
-        <button type="button" class="btn-secondary" onclick="window.BillTab.saveQuotation(event)">
-          💾 Save Quotation
-        </button>
-
-        <button type="button" class="btn-primary" onclick="window.BillTab.generatePdf(event)">
+      <div class="action-bar" style="justify-content: center; gap: 20px;">
+        <button type="button" class="btn-primary" style="padding: 14px 32px; font-size: 1rem;" onclick="window.BillTab.generatePdf(event)">
           📄 Generate PDF
         </button>
 
-        <button type="button" class="btn-whatsapp" onclick="window.BillTab.sendWhatsApp(event)">
+        <button type="button" class="btn-whatsapp" style="padding: 14px 32px; font-size: 1rem;" onclick="window.BillTab.sendWhatsApp(event)">
           💬 Send on WhatsApp
         </button>
       </div>
@@ -479,14 +491,14 @@
   </main>
 
   <!-- JS Modules -->
-  <script src="assets.js?v=3"></script>
-  <script src="data.js?v=3"></script>
-  <script src="storage.js?v=3"></script>
-  <script src="pdfGenerator.js?v=3"></script>
-  <script src="billTab.js?v=3"></script>
-  <script src="summaryTab.js?v=3"></script>
-  <script src="manageTab.js?v=3"></script>
-  <script src="app.js?v=3"></script>
+  <script src="assets.js?v=6"></script>
+  <script src="data.js?v=6"></script>
+  <script src="storage.js?v=6"></script>
+  <script src="pdfGenerator.js?v=6"></script>
+  <script src="billTab.js?v=6"></script>
+  <script src="summaryTab.js?v=6"></script>
+  <script src="manageTab.js?v=6"></script>
+  <script src="app.js?v=6"></script>
 
 </body>
 </html>

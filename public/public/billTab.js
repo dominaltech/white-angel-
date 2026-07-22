@@ -119,9 +119,9 @@ window.BillTab = {
 
   recalculateTotals() {
     const rates = window.StorageManager.getRates();
-    let subtotal = 0;
+    let total = 0;
 
-    // 1. Checkpoint Rows
+    // 1. Checkpoint Rows (Decoration, Photography, Transport, Custom)
     const rows = document.querySelectorAll('.item-row');
     rows.forEach(row => {
       const checkbox = row.querySelector('.item-checkbox');
@@ -129,7 +129,7 @@ window.BillTab = {
         row.classList.add('selected');
         const qty = parseInt(row.querySelector('.qty-input').value) || 1;
         const price = parseFloat(row.querySelector('.item-price-input').value) || 0;
-        subtotal += (qty * price);
+        total += (qty * price);
       } else {
         row.classList.remove('selected');
       }
@@ -138,54 +138,42 @@ window.BillTab = {
     // 2. Catering Calculation
     const vegCount = parseInt(document.getElementById('catVegGuests')?.value) || 0;
     const vegTotal = vegCount * rates.catering.vegPerPlate;
-    if (document.getElementById('catVegTotal')) document.getElementById('catVegTotal').textContent = '₹ ' + vegTotal.toLocaleString('en-IN');
-    subtotal += vegTotal;
+    document.getElementById('catVegTotal').textContent = '₹ ' + vegTotal.toLocaleString('en-IN');
+    total += vegTotal;
 
     const nonVegCount = parseInt(document.getElementById('catNonVegGuests')?.value) || 0;
     const nonVegTotal = nonVegCount * rates.catering.nonVegPerPlate;
-    if (document.getElementById('catNonVegTotal')) document.getElementById('catNonVegTotal').textContent = '₹ ' + nonVegTotal.toLocaleString('en-IN');
-    subtotal += nonVegTotal;
+    document.getElementById('catNonVegTotal').textContent = '₹ ' + nonVegTotal.toLocaleString('en-IN');
+    total += nonVegTotal;
 
     const sweetCount = parseInt(document.getElementById('catSweetsCount')?.value) || 0;
     const sweetTotal = sweetCount * rates.catering.sweetPerPlate;
-    if (document.getElementById('catSweetsTotal')) document.getElementById('catSweetsTotal').textContent = '₹ ' + sweetTotal.toLocaleString('en-IN');
-    subtotal += sweetTotal;
+    document.getElementById('catSweetsTotal').textContent = '₹ ' + sweetTotal.toLocaleString('en-IN');
+    total += sweetTotal;
 
     // Live Counters
     for (let i = 1; i <= 5; i++) {
       const input = document.getElementById(`catLiveCounter_${i}`);
       if (input && input.value.trim() !== '') {
-        subtotal += rates.catering.liveCounterPerUnit;
+        total += rates.catering.liveCounterPerUnit;
       }
     }
 
     // 3. Accommodation Calculation
     const roomsCount = parseInt(document.getElementById('accRoomsCount')?.value) || 0;
     const roomsTotal = roomsCount * rates.accommodation.perRoomPrice;
-    if (document.getElementById('accRoomsTotal')) document.getElementById('accRoomsTotal').textContent = '₹ ' + roomsTotal.toLocaleString('en-IN');
-    subtotal += roomsTotal;
+    document.getElementById('accRoomsTotal').textContent = '₹ ' + roomsTotal.toLocaleString('en-IN');
+    total += roomsTotal;
 
-    // 4. Discount Percentage & Amount Calculation
-    const discountPercent = Math.max(0, Math.min(100, parseFloat(document.getElementById('discountPercentInput')?.value) || 0));
-    const discountAmount = Math.round((subtotal * discountPercent) / 100);
-    const grandTotal = Math.max(0, subtotal - discountAmount);
+    // 4. Update Summary Displays
+    document.getElementById('displayGrandTotal').textContent = '₹ ' + total.toLocaleString('en-IN');
 
     const advancePaid = parseFloat(document.getElementById('advancePaidInput')?.value) || 0;
-    const balance = grandTotal - advancePaid;
-
-    // Update Displays
-    if (document.getElementById('displaySubtotal')) {
-      document.getElementById('displaySubtotal').textContent = '₹ ' + subtotal.toLocaleString('en-IN');
-    }
-    if (document.getElementById('displayGrandTotal')) {
-      document.getElementById('displayGrandTotal').textContent = '₹ ' + grandTotal.toLocaleString('en-IN') + (discountPercent > 0 ? ` (${discountPercent}% OFF)` : '');
-    }
-    if (document.getElementById('displayBalance')) {
-      document.getElementById('displayBalance').textContent = '₹ ' + balance.toLocaleString('en-IN');
-    }
+    const balance = total - advancePaid;
+    document.getElementById('displayBalance').textContent = '₹ ' + balance.toLocaleString('en-IN');
   },
 
-  // Canvas Image Compressor
+  // Fast Canvas Image Compressor (resizes to max 1200px & 0.75 JPEG to prevent memory & localStorage limits)
   compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.75) {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -223,7 +211,7 @@ window.BillTab = {
     });
   },
 
-  // Multi-Image Upload Handler
+  // Unlimited Multi-Image Upload Handler with Automatic Compression
   async handleImageUpload(files) {
     const fileList = Array.from(files).filter(file => file.type.startsWith('image/'));
     if (fileList.length === 0) return;
@@ -242,10 +230,6 @@ window.BillTab = {
         });
       }
     }
-
-    // Reset file input value so user can re-upload same file if needed
-    const fileInput = document.getElementById('imageFileInput');
-    if (fileInput) fileInput.value = '';
 
     this.renderUploadedImages();
     window.App.showToast(`Total ${this.uploadedImages.length} photos ready for PDF!`, 'success');
@@ -289,7 +273,7 @@ window.BillTab = {
     this.renderUploadedImages();
   },
 
-  // Extract Full Quotation Object (Sequential Serial Number: 1, 2, 3...)
+  // Extract Full Quotation Object
   getQuotationData() {
     const rates = window.StorageManager.getRates();
 
@@ -299,7 +283,6 @@ window.BillTab = {
     });
 
     const items = [];
-    let subtotal = 0;
 
     document.querySelectorAll('.item-row').forEach(row => {
       const selected = row.querySelector('.item-checkbox').checked;
@@ -307,8 +290,6 @@ window.BillTab = {
       const quantity = parseInt(row.querySelector('.qty-input').value) || 1;
       const unitPrice = parseFloat(row.querySelector('.item-price-input').value) || 0;
       const category = row.getAttribute('data-category') || 'general';
-
-      if (selected) subtotal += (quantity * unitPrice);
 
       items.push({
         id: row.getAttribute('data-id'),
@@ -322,7 +303,6 @@ window.BillTab = {
 
     const vegCount = parseInt(document.getElementById('catVegGuests')?.value) || 0;
     if (vegCount > 0) {
-      subtotal += (vegCount * rates.catering.vegPerPlate);
       items.push({
         id: 'cat_veg',
         category: 'catering',
@@ -335,7 +315,6 @@ window.BillTab = {
 
     const nonVegCount = parseInt(document.getElementById('catNonVegGuests')?.value) || 0;
     if (nonVegCount > 0) {
-      subtotal += (nonVegCount * rates.catering.nonVegPerPlate);
       items.push({
         id: 'cat_nonveg',
         category: 'catering',
@@ -348,7 +327,6 @@ window.BillTab = {
 
     const sweetCount = parseInt(document.getElementById('catSweetsCount')?.value) || 0;
     if (sweetCount > 0) {
-      subtotal += (sweetCount * rates.catering.sweetPerPlate);
       items.push({
         id: 'cat_sweets',
         category: 'catering',
@@ -362,7 +340,6 @@ window.BillTab = {
     for (let i = 1; i <= 5; i++) {
       const input = document.getElementById(`catLiveCounter_${i}`);
       if (input && input.value.trim() !== '') {
-        subtotal += rates.catering.liveCounterPerUnit;
         items.push({
           id: `cat_live_${i}`,
           category: 'catering',
@@ -377,7 +354,6 @@ window.BillTab = {
     const roomsCount = parseInt(document.getElementById('accRoomsCount')?.value) || 0;
     const hotelName = document.getElementById('accHotelName')?.value || '';
     if (roomsCount > 0) {
-      subtotal += (roomsCount * rates.accommodation.perRoomPrice);
       items.push({
         id: 'acc_rooms',
         category: 'accommodation',
@@ -388,13 +364,8 @@ window.BillTab = {
       });
     }
 
-    const discountPercent = Math.max(0, Math.min(100, parseFloat(document.getElementById('discountPercentInput')?.value) || 0));
-    const discountAmount = Math.round((subtotal * discountPercent) / 100);
-    const grandTotal = Math.max(0, subtotal - discountAmount);
-    const advancePaid = parseFloat(document.getElementById('advancePaidInput')?.value) || 0;
-
     return {
-      id: this.currentQuotationId || window.StorageManager.getNextQuoteId(),
+      id: this.currentQuotationId || ('WA-' + Date.now().toString(36).toUpperCase()),
       clientDetails: {
         groomName: document.getElementById('groomName')?.value || '',
         brideName: document.getElementById('brideName')?.value || '',
@@ -414,57 +385,32 @@ window.BillTab = {
       items,
       images: this.uploadedImages,
       payment: {
-        subtotal,
-        discountPercent,
-        discountAmount,
         estimatedBudget: parseFloat(document.getElementById('estimatedBudgetInput')?.value) || 0,
-        advancePaid,
-        grandTotal,
-        balanceAmount: grandTotal - advancePaid
+        advancePaid: parseFloat(document.getElementById('advancePaidInput')?.value) || 0
       },
       specialInstructions: document.getElementById('specialInstructionsInput')?.value || ''
     };
   },
 
-  // Save Quotation to Summary Tab
-  saveQuotationToSummary() {
+  // Save Quotation with exception fallback
+  saveQuotation(e) {
+    if (e && e.preventDefault) e.preventDefault();
+
     const data = this.getQuotationData();
     const saved = window.StorageManager.saveQuotation(data);
-    if (saved && window.SummaryTab) {
-      window.SummaryTab.loadQuotations();
+    if (saved) {
+      this.currentQuotationId = saved.id;
+      window.App.showToast(`Quotation ${saved.id} saved!`, 'success');
+      if (window.SummaryTab) window.SummaryTab.loadQuotations();
     }
-    return data;
+    return data; // Always return active data for PDF generation!
   },
 
-  // Clear Form Fields immediately after action
-  clearFormFields() {
-    this.currentQuotationId = null;
-    this.uploadedImages = [];
-    this.renderForm();
-
-    ['groomName', 'brideName', 'mobileNumber', 'alternateNumber', 'clientAddress', 'clientEmail', 
-     'weddingDate', 'venueName', 'venueAddress', 'eventTime', 'guestCount', 
-     'catVegGuests', 'catNonVegGuests', 'catSweetsCount', 'accRoomsCount', 'accHotelName',
-     'estimatedBudgetInput', 'discountPercentInput', 'advancePaidInput', 'specialInstructionsInput'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = '';
-    });
-
-    for (let i = 1; i <= 5; i++) {
-      const el = document.getElementById(`catLiveCounter_${i}`);
-      if (el) el.value = '';
-    }
-
-    document.querySelectorAll('.function-checkbox').forEach(cb => cb.checked = false);
-    this.renderUploadedImages();
-    this.recalculateTotals();
-  },
-
-  // Generate & Download PDF (Saves to Summary + Clears Bill Form)
+  // Generate PDF
   async generatePdf(e) {
     if (e && e.preventDefault) e.preventDefault();
 
-    const data = this.saveQuotationToSummary();
+    const data = this.saveQuotation();
     if (!data) return;
 
     window.App.showToast(`Generating PDF (${data.images.length} photos)...`, 'info');
@@ -472,60 +418,76 @@ window.BillTab = {
     try {
       const doc = await window.PdfGenerator.generatePdf(data);
       const clientName = [data.clientDetails.groomName, data.clientDetails.brideName].filter(Boolean).join('_') || 'Client';
-      const filename = `White_Angel_Quotation_${clientName}_No${data.id}.pdf`;
+      const filename = `White_Angel_Quotation_${clientName}_${data.id}.pdf`;
       doc.save(filename);
-      
-      // Clear form entries immediately after generating
-      this.clearFormFields();
-      window.App.showToast(`Quotation #${data.id} saved to Summary & PDF downloaded!`, 'success');
+      window.App.showToast('PDF generated and downloaded!', 'success');
     } catch (err) {
       console.error('PDF error:', err);
       window.App.showToast('Error generating PDF', 'error');
     }
   },
 
-  // Send Current Generated PDF via WhatsApp (Using Web Share API for direct PDF File Sharing)
-  async sendWhatsApp(e) {
+  // Send WhatsApp
+  sendWhatsApp(e) {
     if (e && e.preventDefault) e.preventDefault();
 
-    const data = this.saveQuotationToSummary();
+    const data = this.saveQuotation();
     if (!data) return;
 
-    window.App.showToast('Generating PDF file for WhatsApp sharing...', 'info');
+    const phone = data.clientDetails.mobileNumber.replace(/\D/g, '');
+    const clientName = [data.clientDetails.groomName, data.clientDetails.brideName].filter(Boolean).join(' & ') || 'Client';
 
-    try {
-      const doc = await window.PdfGenerator.generatePdf(data);
-      const clientName = [data.clientDetails.groomName, data.clientDetails.brideName].filter(Boolean).join('_') || 'Client';
-      const filename = `White_Angel_Quotation_${clientName}_No${data.id}.pdf`;
+    let grandTotal = 0;
+    data.items.filter(i => i.selected).forEach(i => {
+      grandTotal += (i.quantity * i.unitPrice);
+    });
+    const balance = grandTotal - (data.payment.advancePaid || 0);
 
-      // Convert jsPDF document object into a PDF File Blob
-      const pdfArrayBuffer = doc.output('arraybuffer');
-      const pdfBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
-      const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+    const message = `*WHITE ANGEL EVENTS* - Quotation Details 🌸
+-------------------------------------
+*Quote ID:* ${data.id}
+*Client:* ${clientName}
+*Event Date:* ${data.eventDetails.weddingDate || 'TBD'}
+*Venue:* ${data.eventDetails.venueName || 'TBD'}
+*Functions:* ${(data.selectedFunctions || []).join(', ') || 'Wedding Event'}
 
-      const phone = data.clientDetails.mobileNumber.replace(/\D/g, '');
+*Grand Total:* Rs. ${grandTotal.toLocaleString('en-IN')}
+*Advance Paid:* Rs. ${(data.payment.advancePaid || 0).toLocaleString('en-IN')}
+*Balance Amount:* Rs. ${balance.toLocaleString('en-IN')}
 
-      // Direct Web Share API for Mobile & Compatible Browsers
-      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-        await navigator.share({
-          files: [pdfFile],
-          title: `White Angel Events Quotation #${data.id}`,
-          text: `White Angel Events Quotation for ${clientName}`
-        });
-        window.App.showToast(`PDF #${data.id} shared directly to WhatsApp!`, 'success');
-      } else {
-        // Fallback for Desktop Browsers
-        doc.save(filename);
-        const whatsappUrl = phone ? `https://wa.me/91${phone}` : `https://wa.me/`;
-        window.open(whatsappUrl, '_blank');
-        window.App.showToast(`PDF #${data.id} downloaded! Please attach it in WhatsApp chat.`, 'info');
+Thank you for choosing White Angel Events!
+_Creating Moments, Building Memories_ 💖`;
+
+    const encodedMsg = encodeURIComponent(message);
+    const whatsappUrl = phone ? `https://wa.me/91${phone}?text=${encodedMsg}` : `https://wa.me/?text=${encodedMsg}`;
+
+    window.open(whatsappUrl, '_blank');
+  },
+
+  // Reset Form
+  resetForm() {
+    if (confirm('Clear current form to create a new blank quotation?')) {
+      this.currentQuotationId = null;
+      this.uploadedImages = [];
+      this.renderForm();
+      
+      ['groomName', 'brideName', 'mobileNumber', 'alternateNumber', 'clientAddress', 'clientEmail', 
+       'weddingDate', 'venueName', 'venueAddress', 'eventTime', 'guestCount', 
+       'catVegGuests', 'catNonVegGuests', 'catSweetsCount', 'accRoomsCount', 'accHotelName',
+       'estimatedBudgetInput', 'advancePaidInput', 'specialInstructionsInput'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+
+      for (let i = 1; i <= 5; i++) {
+        const el = document.getElementById(`catLiveCounter_${i}`);
+        if (el) el.value = '';
       }
 
-      // Clear form entries immediately after sharing
-      this.clearFormFields();
-    } catch (err) {
-      console.error('WhatsApp PDF sharing error:', err);
-      this.clearFormFields();
+      document.querySelectorAll('.function-checkbox').forEach(cb => cb.checked = false);
+      this.renderUploadedImages();
+      this.recalculateTotals();
+      window.App.showToast('Form cleared for new quotation', 'info');
     }
   },
 
@@ -575,9 +537,8 @@ window.BillTab = {
     const sweetItem = (quotation.items || []).find(i => i.id === 'cat_sweets');
     if (sweetItem && document.getElementById('catSweetsCount')) document.getElementById('catSweetsCount').value = sweetItem.quantity;
 
-    // Payments & Discount
+    // Payments
     if (document.getElementById('estimatedBudgetInput')) document.getElementById('estimatedBudgetInput').value = quotation.payment?.estimatedBudget || 0;
-    if (document.getElementById('discountPercentInput')) document.getElementById('discountPercentInput').value = quotation.payment?.discountPercent || 0;
     if (document.getElementById('advancePaidInput')) document.getElementById('advancePaidInput').value = quotation.payment?.advancePaid || 0;
 
     // Special Instructions
@@ -589,7 +550,7 @@ window.BillTab = {
 
     this.recalculateTotals();
     window.App.switchTab('bill');
-    window.App.showToast(`Loaded Quotation #${quotation.id} for editing`, 'info');
+    window.App.showToast(`Loaded Quotation ${quotation.id} for editing`, 'info');
   },
 
   bindEvents() {

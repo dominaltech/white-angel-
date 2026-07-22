@@ -1,74 +1,85 @@
-// Main App Controller for White Angel Events Quotation System
+// Main App Orchestrator for White Angel Events Quotation System
 window.App = {
-  activeTab: 'bill',
-
   init() {
+    this.initTheme();
     this.bindNavigation();
-    
-    // Initialize Sub-Controllers
-    if (window.BillTab) window.BillTab.init();
-    if (window.SummaryTab) window.SummaryTab.init();
-    if (window.ManageTab) window.ManageTab.init();
+    this.initModules();
+  },
 
-    this.switchTab('bill');
+  // Default to Day Mode ☀️ every time the system is opened
+  initTheme() {
+    const defaultTheme = 'light';
+    document.documentElement.setAttribute('data-theme', defaultTheme);
+    this.updateThemeIcon(defaultTheme);
+  },
+
+  toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
+    const nextTheme = current === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', nextTheme);
+    localStorage.setItem('wa_theme_mode', nextTheme);
+    this.updateThemeIcon(nextTheme);
+    this.showToast(`Switched to ${nextTheme === 'light' ? 'Day Mode ☀️' : 'Night Mode 🌙'}`, 'info');
+  },
+
+  updateThemeIcon(theme) {
+    const iconBtn = document.getElementById('themeToggleBtn');
+    if (!iconBtn) return;
+    if (theme === 'light') {
+      // Show Moon icon (Click to switch to Night mode)
+      iconBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>`;
+      iconBtn.setAttribute('title', 'Switch to Night Mode 🌙');
+    } else {
+      // Show Sun icon (Click to switch to Day mode)
+      iconBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+      iconBtn.setAttribute('title', 'Switch to Day Mode ☀️');
+    }
   },
 
   bindNavigation() {
-    // Desktop Nav Buttons
-    document.querySelectorAll('.desktop-nav .nav-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const tab = btn.getAttribute('data-tab');
-        this.switchTab(tab);
-      });
-    });
-
-    // Mobile Nav Buttons
-    document.querySelectorAll('.mobile-nav .mobile-nav-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const tab = btn.getAttribute('data-tab');
-        this.switchTab(tab);
+    // Desktop & Mobile Nav Tab switching
+    document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const targetTab = btn.getAttribute('data-tab');
+        this.switchTab(targetTab);
       });
     });
   },
 
-  switchTab(tabName) {
-    this.activeTab = tabName;
-
-    // Update Desktop Nav Buttons
-    document.querySelectorAll('.desktop-nav .nav-btn').forEach(btn => {
-      if (btn.getAttribute('data-tab') === tabName) {
-        btn.classList.add('active');
+  switchTab(tabId) {
+    // Update active tab buttons
+    document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(b => {
+      if (b.getAttribute('data-tab') === tabId) {
+        b.classList.add('active');
       } else {
-        btn.classList.remove('active');
+        b.classList.remove('active');
       }
     });
 
-    // Update Mobile Nav Buttons
-    document.querySelectorAll('.mobile-nav .mobile-nav-btn').forEach(btn => {
-      if (btn.getAttribute('data-tab') === tabName) {
-        btn.classList.add('active');
+    // Update active content panels
+    document.querySelectorAll('.tab-content').forEach(panel => {
+      if (panel.id === `tab-${tabId}`) {
+        panel.classList.add('active');
       } else {
-        btn.classList.remove('active');
+        panel.classList.remove('active');
       }
     });
 
-    // Show/Hide Tab Contents
-    document.querySelectorAll('.tab-content').forEach(content => {
-      if (content.id === `tab-${tabName}`) {
-        content.classList.add('active');
-      } else {
-        content.classList.remove('active');
-      }
-    });
-
-    // Refresh Tab Data when switched
-    if (tabName === 'summary' && window.SummaryTab) {
+    // Refresh sub-module views on tab switch
+    if (tabId === 'summary' && window.SummaryTab) {
       window.SummaryTab.loadQuotations();
-    } else if (tabName === 'manage' && window.ManageTab) {
+    }
+    if (tabId === 'manage' && window.ManageTab) {
       window.ManageTab.renderRatesForm();
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  },
+
+  initModules() {
+    if (window.BillTab) window.BillTab.init();
+    if (window.SummaryTab) window.SummaryTab.init();
+    if (window.ManageTab) window.ManageTab.init();
   },
 
   showToast(message, type = 'info') {
@@ -76,30 +87,44 @@ window.App = {
     if (!container) {
       container = document.createElement('div');
       container.id = 'toastContainer';
-      container.className = 'toast-container';
+      container.style.cssText = `
+        position: fixed;
+        bottom: 80px;
+        right: 20px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none;
+      `;
       document.body.appendChild(container);
     }
 
     const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
+    toast.style.cssText = `
+      background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#0284c7'};
+      color: white;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+      pointer-events: auto;
+      animation: slideIn 0.25s ease;
+    `;
+    toast.textContent = message;
 
-    let icon = 'ℹ️';
-    if (type === 'success') icon = '✅';
-    if (type === 'error') icon = '❌';
-
-    toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
     container.appendChild(toast);
 
     setTimeout(() => {
       toast.style.opacity = '0';
-      toast.style.transform = 'translateY(10px)';
-      toast.style.transition = 'all 0.3s ease';
+      toast.style.transition = 'opacity 0.3s ease';
       setTimeout(() => toast.remove(), 300);
-    }, 3500);
+    }, 3000);
   }
 };
 
-// Initialize App when DOM Ready
+// Initialize App when DOM is fully loaded
 document.addEventListener('DOMContentLoaded', () => {
   window.App.init();
 });

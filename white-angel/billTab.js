@@ -121,7 +121,7 @@ window.BillTab = {
     const rates = window.StorageManager.getRates();
     let subtotal = 0;
 
-    // 1. Checkpoint Rows (Decoration, Photography, Transport, Custom)
+    // 1. Checkpoint Rows
     const rows = document.querySelectorAll('.item-row');
     rows.forEach(row => {
       const checkbox = row.querySelector('.item-checkbox');
@@ -185,7 +185,7 @@ window.BillTab = {
     }
   },
 
-  // Fast Canvas Image Compressor
+  // Canvas Image Compressor
   compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.75) {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -243,6 +243,10 @@ window.BillTab = {
       }
     }
 
+    // Reset file input value so user can re-upload same file if needed
+    const fileInput = document.getElementById('imageFileInput');
+    if (fileInput) fileInput.value = '';
+
     this.renderUploadedImages();
     window.App.showToast(`Total ${this.uploadedImages.length} photos ready for PDF!`, 'success');
   },
@@ -285,7 +289,7 @@ window.BillTab = {
     this.renderUploadedImages();
   },
 
-  // Extract Full Quotation Object
+  // Extract Full Quotation Object (Sequential Serial Number: 1, 2, 3...)
   getQuotationData() {
     const rates = window.StorageManager.getRates();
 
@@ -390,7 +394,7 @@ window.BillTab = {
     const advancePaid = parseFloat(document.getElementById('advancePaidInput')?.value) || 0;
 
     return {
-      id: this.currentQuotationId || ('WA-' + Date.now().toString(36).toUpperCase()),
+      id: this.currentQuotationId || window.StorageManager.getNextQuoteId(),
       clientDetails: {
         groomName: document.getElementById('groomName')?.value || '',
         brideName: document.getElementById('brideName')?.value || '',
@@ -422,25 +426,45 @@ window.BillTab = {
     };
   },
 
-  // Save Quotation
-  saveQuotation(e) {
-    if (e && e.preventDefault) e.preventDefault();
-
+  // Save Quotation to Summary Tab
+  saveQuotationToSummary() {
     const data = this.getQuotationData();
     const saved = window.StorageManager.saveQuotation(data);
-    if (saved) {
-      this.currentQuotationId = saved.id;
-      window.App.showToast(`Quotation ${saved.id} saved!`, 'success');
-      if (window.SummaryTab) window.SummaryTab.loadQuotations();
+    if (saved && window.SummaryTab) {
+      window.SummaryTab.loadQuotations();
     }
     return data;
   },
 
-  // Generate PDF
+  // Clear Form Fields immediately after action
+  clearFormFields() {
+    this.currentQuotationId = null;
+    this.uploadedImages = [];
+    this.renderForm();
+
+    ['groomName', 'brideName', 'mobileNumber', 'alternateNumber', 'clientAddress', 'clientEmail', 
+     'weddingDate', 'venueName', 'venueAddress', 'eventTime', 'guestCount', 
+     'catVegGuests', 'catNonVegGuests', 'catSweetsCount', 'accRoomsCount', 'accHotelName',
+     'estimatedBudgetInput', 'discountPercentInput', 'advancePaidInput', 'specialInstructionsInput'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+
+    for (let i = 1; i <= 5; i++) {
+      const el = document.getElementById(`catLiveCounter_${i}`);
+      if (el) el.value = '';
+    }
+
+    document.querySelectorAll('.function-checkbox').forEach(cb => cb.checked = false);
+    this.renderUploadedImages();
+    this.recalculateTotals();
+  },
+
+  // Generate & Download PDF (Saves to Summary + Clears Bill Form)
   async generatePdf(e) {
     if (e && e.preventDefault) e.preventDefault();
 
-    const data = this.saveQuotation();
+    const data = this.saveQuotationToSummary();
     if (!data) return;
 
     window.App.showToast(`Generating PDF (${data.images.length} photos)...`, 'info');
@@ -448,74 +472,60 @@ window.BillTab = {
     try {
       const doc = await window.PdfGenerator.generatePdf(data);
       const clientName = [data.clientDetails.groomName, data.clientDetails.brideName].filter(Boolean).join('_') || 'Client';
-      const filename = `White_Angel_Quotation_${clientName}_${data.id}.pdf`;
+      const filename = `White_Angel_Quotation_${clientName}_No${data.id}.pdf`;
       doc.save(filename);
-      window.App.showToast('PDF generated and downloaded!', 'success');
+      
+      // Clear form entries immediately after generating
+      this.clearFormFields();
+      window.App.showToast(`Quotation #${data.id} saved to Summary & PDF downloaded!`, 'success');
     } catch (err) {
       console.error('PDF error:', err);
       window.App.showToast('Error generating PDF', 'error');
     }
   },
 
-  // Send WhatsApp
-  sendWhatsApp(e) {
+  // Send Current Generated PDF via WhatsApp (Using Web Share API for direct PDF File Sharing)
+  async sendWhatsApp(e) {
     if (e && e.preventDefault) e.preventDefault();
 
-    const data = this.saveQuotation();
+    const data = this.saveQuotationToSummary();
     if (!data) return;
 
-    const phone = data.clientDetails.mobileNumber.replace(/\D/g, '');
-    const clientName = [data.clientDetails.groomName, data.clientDetails.brideName].filter(Boolean).join(' & ') || 'Client';
+    window.App.showToast('Generating PDF file for WhatsApp sharing...', 'info');
 
-    const subtotal = data.payment.subtotal || 0;
-    const discountStr = data.payment.discountPercent > 0 ? `\n*Discount (${data.payment.discountPercent}%):* -Rs. ${data.payment.discountAmount.toLocaleString('en-IN')}` : '';
+    try {
+      const doc = await window.PdfGenerator.generatePdf(data);
+      const clientName = [data.clientDetails.groomName, data.clientDetails.brideName].filter(Boolean).join('_') || 'Client';
+      const filename = `White_Angel_Quotation_${clientName}_No${data.id}.pdf`;
 
-    const message = `*WHITE ANGEL EVENTS* - Quotation Details 🌸
--------------------------------------
-*Quote ID:* ${data.id}
-*Client:* ${clientName}
-*Event Date:* ${data.eventDetails.weddingDate || 'TBD'}
-*Venue:* ${data.eventDetails.venueName || 'TBD'}
-*Functions:* ${(data.selectedFunctions || []).join(', ') || 'Wedding Event'}
+      // Convert jsPDF document object into a PDF File Blob
+      const pdfArrayBuffer = doc.output('arraybuffer');
+      const pdfBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
+      const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
 
-*Subtotal:* Rs. ${subtotal.toLocaleString('en-IN')}${discountStr}
-*Grand Total:* Rs. ${data.payment.grandTotal.toLocaleString('en-IN')}
-*Advance Paid:* Rs. ${(data.payment.advancePaid || 0).toLocaleString('en-IN')}
-*Balance Amount:* Rs. ${data.payment.balanceAmount.toLocaleString('en-IN')}
+      const phone = data.clientDetails.mobileNumber.replace(/\D/g, '');
 
-Thank you for choosing White Angel Events!
-_Creating Moments, Building Memories_ 💖`;
-
-    const encodedMsg = encodeURIComponent(message);
-    const whatsappUrl = phone ? `https://wa.me/91${phone}?text=${encodedMsg}` : `https://wa.me/?text=${encodedMsg}`;
-
-    window.open(whatsappUrl, '_blank');
-  },
-
-  // Reset Form
-  resetForm() {
-    if (confirm('Clear current form to create a new blank quotation?')) {
-      this.currentQuotationId = null;
-      this.uploadedImages = [];
-      this.renderForm();
-      
-      ['groomName', 'brideName', 'mobileNumber', 'alternateNumber', 'clientAddress', 'clientEmail', 
-       'weddingDate', 'venueName', 'venueAddress', 'eventTime', 'guestCount', 
-       'catVegGuests', 'catNonVegGuests', 'catSweetsCount', 'accRoomsCount', 'accHotelName',
-       'estimatedBudgetInput', 'discountPercentInput', 'advancePaidInput', 'specialInstructionsInput'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = '';
-      });
-
-      for (let i = 1; i <= 5; i++) {
-        const el = document.getElementById(`catLiveCounter_${i}`);
-        if (el) el.value = '';
+      // Direct Web Share API for Mobile & Compatible Browsers
+      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        await navigator.share({
+          files: [pdfFile],
+          title: `White Angel Events Quotation #${data.id}`,
+          text: `White Angel Events Quotation for ${clientName}`
+        });
+        window.App.showToast(`PDF #${data.id} shared directly to WhatsApp!`, 'success');
+      } else {
+        // Fallback for Desktop Browsers
+        doc.save(filename);
+        const whatsappUrl = phone ? `https://wa.me/91${phone}` : `https://wa.me/`;
+        window.open(whatsappUrl, '_blank');
+        window.App.showToast(`PDF #${data.id} downloaded! Please attach it in WhatsApp chat.`, 'info');
       }
 
-      document.querySelectorAll('.function-checkbox').forEach(cb => cb.checked = false);
-      this.renderUploadedImages();
-      this.recalculateTotals();
-      window.App.showToast('Form cleared for new quotation', 'info');
+      // Clear form entries immediately after sharing
+      this.clearFormFields();
+    } catch (err) {
+      console.error('WhatsApp PDF sharing error:', err);
+      this.clearFormFields();
     }
   },
 
@@ -579,7 +589,7 @@ _Creating Moments, Building Memories_ 💖`;
 
     this.recalculateTotals();
     window.App.switchTab('bill');
-    window.App.showToast(`Loaded Quotation ${quotation.id} for editing`, 'info');
+    window.App.showToast(`Loaded Quotation #${quotation.id} for editing`, 'info');
   },
 
   bindEvents() {

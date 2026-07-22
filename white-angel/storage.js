@@ -9,9 +9,12 @@ window.StorageManager = {
   getRates() {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.RATES);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
     } catch (e) {
-      console.error('Error reading rates:', e);
+      console.error('Error reading rates master from storage:', e);
     }
     return JSON.parse(JSON.stringify(window.DEFAULT_RATES));
   },
@@ -21,7 +24,7 @@ window.StorageManager = {
       localStorage.setItem(STORAGE_KEYS.RATES, JSON.stringify(rates));
       return true;
     } catch (e) {
-      console.error('Error saving rates:', e);
+      console.error('Error saving rates master to storage:', e);
       return false;
     }
   },
@@ -31,25 +34,64 @@ window.StorageManager = {
       localStorage.removeItem(STORAGE_KEYS.RATES);
       return this.getRates();
     } catch (e) {
-      console.error('Error resetting rates:', e);
+      console.error('Error resetting rates master:', e);
     }
   },
 
-  // Saved Quotations Management (with Exception Fallback to prevent storage limits)
+  // Helper to generate simple sequential serial numbers: 1, 2, 3...
+  getNextQuoteId() {
+    const list = this.getQuotations();
+    let maxId = 0;
+    if (Array.isArray(list)) {
+      list.forEach(q => {
+        const num = parseInt(q.id, 10);
+        if (!isNaN(num) && num > maxId) maxId = num;
+      });
+    }
+    return (maxId + 1).toString();
+  },
+
+  // Saved Quotations Management (Sequential Serial IDs 1, 2, 3...)
   getQuotations() {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.QUOTES);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        let list = JSON.parse(saved);
+        if (Array.isArray(list)) {
+          // Migration: Auto-convert any legacy alphanumeric IDs (like WA-MRW4KJEW) to sequential numeric IDs 1, 2, 3...
+          let needsResave = false;
+          list.forEach((q, idx) => {
+            if (!q || !q.id || isNaN(parseInt(q.id, 10))) {
+              if (q) q.id = (list.length - idx).toString();
+              needsResave = true;
+            }
+          });
+
+          if (needsResave) {
+            localStorage.setItem(STORAGE_KEYS.QUOTES, JSON.stringify(list));
+          }
+
+          return list;
+        }
+      }
     } catch (e) {
-      console.error('Error reading quotations:', e);
+      console.error('Error reading quotations from storage:', e);
     }
     return [];
   },
 
   saveQuotation(quotation) {
+    if (!quotation) return null;
+
     try {
       const list = this.getQuotations();
-      const existingIndex = list.findIndex(q => q.id === quotation.id);
+      
+      // Ensure quotation has a simple numeric sequential serial number (1, 2, 3...)
+      if (!quotation.id || isNaN(parseInt(quotation.id, 10))) {
+        quotation.id = this.getNextQuoteId();
+      }
+
+      const existingIndex = list.findIndex(q => String(q.id) === String(quotation.id));
       
       const now = new Date().toISOString();
       quotation.updatedAt = now;
@@ -61,7 +103,6 @@ window.StorageManager = {
         list[existingIndex] = quoteToStore;
       } else {
         quoteToStore.createdAt = quoteToStore.createdAt || now;
-        quoteToStore.id = quoteToStore.id || 'WA-' + Date.now().toString(36).toUpperCase();
         list.unshift(quoteToStore);
       }
 
@@ -86,13 +127,13 @@ window.StorageManager = {
 
   getQuotationById(id) {
     const list = this.getQuotations();
-    return list.find(q => q.id === id) || null;
+    return list.find(q => String(q.id) === String(id)) || null;
   },
 
   deleteQuotation(id) {
     try {
       let list = this.getQuotations();
-      list = list.filter(q => q.id !== id);
+      list = list.filter(q => String(q.id) !== String(id));
       localStorage.setItem(STORAGE_KEYS.QUOTES, JSON.stringify(list));
       return true;
     } catch (e) {
