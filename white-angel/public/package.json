@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "description": "White Angel Events - Quotation Maker System",
-  "main": "public/index.html",
+  "main": "index.html",
   "scripts": {
-    "build": "mkdir -p public && cp -r index.html styles.css *.js assets public/ 2>/dev/null || true"
+    "build": "echo 'Static site ready'"
   },
   "keywords": ["event-management", "quotation-maker", "pdf-generator", "white-angel-events"],
   "author": "White Angel Events",
